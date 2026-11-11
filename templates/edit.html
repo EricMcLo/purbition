@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit {{ adventure.name }} - Purbition{% endblock %}
+
+{% block content %}
+<section class="create-page">
+    <header class="page-header">
+        <h2>Edit Event</h2>
+        <p>Update the details — the share link stays the same</p>
+    </header>
+
+    {% include '_adventure_form.html' %}
+</section>
+{% endblock %}

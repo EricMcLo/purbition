@@ -1,0 +1,207 @@
+{# Carpool card — single source of truth.
+   Rendered by the server on page load AND returned as an HTML fragment after
+   every carpool action (see the /carpool and /carpool_creator routes). The
+   browser just inserts this HTML; it never re-derives the markup itself, so
+   the card can't drift between the template and JS.
+
+   Context: drivers, unclaimed_riders, carpool_summary, my_rsvp (or none),
+            adventure (row used for url_for only). Actions post to /carpool
+            (peer actions) and /carpool_creator (anyone-with-link moves/edits).
+#}
+{% set cp_url = url_for('carpool', share_id=adventure.share_id) %}
+{% set creator_url = url_for('carpool_creator', share_id=adventure.share_id) %}
+{% set my_id = my_rsvp.id if my_rsvp else none %}
+
+<div class="carpool" id="carpoolCard" data-creator-url="{{ creator_url }}">
+    <svg class="carpool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/><path d="M3 11h18v6h-2a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H3z"/>
+    </svg>
+
+    <div class="carpool-body">
+        <div class="carpool-title-row">
+            <p class="carpool-title">Carpool</p>
+            {%- set st = carpool_summary -%}
+            <p class="carpool-aggregate {% if st.riders_unclaimed %}is-warn{% endif %}">
+                {%- if st.riders_unclaimed == 0 -%}
+                    {{ st.total_seats }} seat{{ '' if st.total_seats == 1 else 's' }} &middot; &#10003; Everyone&rsquo;s sorted
+                {%- else -%}
+                    {{ st.total_seats }} seat{{ '' if st.total_seats == 1 else 's' }} &middot;
+                    need {{ st.riders_unclaimed }} more seat{{ '' if st.riders_unclaimed == 1 else 's' }}
+                {%- endif -%}
+            </p>
+        </div>
+
+        {%- if drivers %}
+        <div class="carpool-drivers">
+            {% for d in drivers %}
+            <div class="carpool-driver" data-driver-id="{{ d.id }}">
+                <div class="carpool-driver-head">
+                    <span class="carpool-driver-avatar" aria-hidden="true">{{ d.name[:1] }}</span>
+                    <div class="carpool-driver-meta">
+                        <p class="carpool-driver-name">{{ d.name }}&rsquo;s car</p>
+                        <div class="carpool-driver-sub">
+                            {% if d.departure_time %}<span>{{ d.departure_time | format_time }}</span>{% endif %}
+                            {% if d.departure_location %}<span>{{ d.departure_location }}</span>{% endif %}
+                        </div>
+                    </div>
+                    <button type="button" class="carpool-edit-driver" aria-label="Edit {{ d.name }}'s car" title="Edit car details">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4l6 6L8 22H2v-6L14 4z"/><path d="M14 4l6 6"/></svg>
+                    </button>
+                </div>
+
+                {# Seat visualisation: one slot per seat; filled = rider, empty = open. #}
+                {% set cap = d.seats if d.seats else (d.riders | length) %}
+                {% if cap and cap >= (d.riders | length) %}
+                <div class="carpool-seats" role="group" aria-label="Seats in {{ d.name }}'s car">
+                    {% for i in range(cap) %}
+                        {% set r = d.riders[i] if i < (d.riders | length) else none %}
+                        {% if r %}
+                        <span class="seat-seat is-filled" title="{{ r.name }}"
+                              {% if my_id and (my_id == r.id or my_id == d.id) %}
+                              data-action="unclaim" data-attendee="{{ r.id }}" tabindex="0" role="button"
+                              aria-label="Remove {{ r.name }} from this car"{% endif %}>
+                            {{ r.name[:1] }}
+                        </span>
+                        {% else %}
+                        <span class="seat-seat is-empty" aria-hidden="true"></span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {# Full-name list under the dots. Ensures long names like "Ella
+                   Blake" don't get truncated or crowd neighbouring initials
+                   on narrow phone screens. Wraps to multiple lines if needed. #}
+                {% if d.riders %}
+                <ul class="carpool-rider-names" aria-label="Riders in {{ d.name }}'s car">
+                    {% for r in d.riders %}
+                    <li class="carpool-rider-names-item">
+                        <span class="carpool-rider-names-avatar" aria-hidden="true">{{ r.name[:1] }}</span>
+                        <span class="carpool-rider-names-text">{{ r.name }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                {# Hidden inline edit form for this driver's car details #}
+                <form class="carpool-edit-form" data-driver-id="{{ d.id }}" data-url="{{ creator_url }}" hidden>
+                    <input type="hidden" name="action" value="edit_driver">
+                    <input type="hidden" name="driver_id" value="{{ d.id }}">
+                    <div class="carpool-edit-row">
+                        <label>Seats
+                            <input type="number" name="seats" min="1" max="15"
+                                   value="{{ d.seats or '' }}" placeholder="e.g. 3" class="carpool-edit-input">
+                        </label>
+                        <label>Departure
+                            <input type="time" name="departure_time"
+                                   value="{{ d.departure_time or '' }}" class="carpool-edit-input">
+                        </label>
+                        <label>Where from
+                            <input type="text" name="departure_location"
+                                   value="{{ d.departure_location or '' }}"
+                                   placeholder="e.g. 9th & 9th" class="carpool-edit-input">
+                        </label>
+                    </div>
+                    <div class="carpool-edit-actions">
+                        <button type="submit" class="btn btn-soft btn-small">Save</button>
+                        <button type="button" class="carpool-edit-cancel btn-small">Cancel</button>
+                    </div>
+                </form>
+
+                {# Riders listed as chips when there are more than the seat dots show,
+                   or when a move affordance is useful. #}
+                {% set unclaimed_for_driver = unclaimed_riders | rejectattr('id', 'in', d.riders | map(attribute='id') | list) | list %}
+                {% if my_id and my_id == d.id and unclaimed_for_driver %}
+                <form method="POST" action="{{ cp_url }}" class="carpool-action-form carpool-add-rider" data-add data-url="{{ cp_url }}">
+                    <input type="hidden" name="action" value="claim_rider">
+                    <label><select name="attendee_id" class="carpool-select" aria-label="Add a rider to your car">
+                        <option value="">+ Add a rider</option>
+                        {% for r in unclaimed_for_driver %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+                    </select></label>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="carpool-none">No drivers yet &middot; tick &ldquo;I&rsquo;m driving&rdquo; when you RSVP Going.</p>
+        {% endif %}
+
+        {%- if unclaimed_riders %}
+        <div class="carpool-need-ride">
+            <p class="carpool-section-label">Still need a ride</p>
+
+            {# "Find a seat" prompt — shown only to the current user when they're
+               an unclaimed rider AND at least one car still has an open seat.
+               Lists the open cars (with their departure details) one tap away. #}
+            {%- set my_unclaimed = unclaimed_riders | selectattr('id', 'equalto', my_id) | list %}
+            {%- set real_open = [] %}
+            {%- for d in drivers if d.seats and (d.seats - (d.riders | length)) > 0 %}{% set _ = real_open.append(d) %}{% endfor %}
+            {%- if my_unclaimed and real_open %}
+            <div class="carpool-find-seat">
+                <div class="carpool-find-seat-head">
+                    <strong>Find a seat</strong>
+                    <span>{{ real_open | length }} car{{ '' if real_open | length == 1 else 's' }} with room</span>
+                </div>
+                <ul class="carpool-find-seat-list">
+                    {% for d in real_open %}
+                    {% set open_n = d.seats - (d.riders | length) %}
+                    <li>
+                        <span class="carpool-find-seat-car">
+                            <span class="carpool-find-seat-name">{{ d.name }}</span>
+                            {% if d.departure_time or d.departure_location %}
+                            <span class="carpool-find-seat-when">
+                                {% if d.departure_time %}{{ d.departure_time | format_time }}{% endif %}{% if d.departure_location %}{% if d.departure_time %} &middot; {% endif %}{{ d.departure_location }}{% endif %}
+                            </span>
+                            {% endif %}
+                            <span class="carpool-find-seat-open">{{ open_n }} open</span>
+                        </span>
+                        <form method="POST" action="{{ cp_url }}" class="carpool-action-form" data-url="{{ cp_url }}">
+                            <input type="hidden" name="action" value="claim_driver">
+                            <input type="hidden" name="attendee_id" value="{{ d.id }}">
+                            <button type="submit" class="btn btn-soft btn-small">Claim a seat</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <ul class="carpool-riders-list">
+                {% for r in unclaimed_riders %}
+                <li>
+                    <span class="carpool-rider-name">{{ r.name }}</span>
+                    {% if my_id and my_id == r.id and drivers %}
+                    <form method="POST" action="{{ cp_url }}" class="carpool-action-form" data-url="{{ cp_url }}">
+                        <input type="hidden" name="action" value="claim_driver">
+                        <div class="carpool-pick-driver">
+                            <select name="attendee_id" class="carpool-select" aria-label="Pick a driver">
+                                <option value="">Pick a driver</option>
+                                {% for d in drivers %}
+                                <option value="{{ d.id }}">{{ d.name }}{% if d.departure_time %} ({{ d.departure_time | format_time }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-soft btn-small">Claim</button>
+                        </div>
+                    </form>
+                    {% endif %}
+                    {% if drivers | length > 1 %}
+                    <form method="POST" action="{{ creator_url }}" class="carpool-action-form carpool-move-rider" data-rider-id="{{ r.id }}" data-url="{{ creator_url }}">
+                        <input type="hidden" name="action" value="move_rider">
+                        <input type="hidden" name="rider_id" value="{{ r.id }}">
+                        <div class="carpool-pick-driver">
+                            <select name="driver_id" class="carpool-select" aria-label="Assign {{ r.name }} to a car">
+                                <option value="">assign</option>
+                                {% for d in drivers %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-soft btn-small">Move</button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>

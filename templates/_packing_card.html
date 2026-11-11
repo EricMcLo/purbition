@@ -1,0 +1,113 @@
+{# "What to Bring" card — potluck item board + claim flow.
+   Single source of truth; server renders on page load AND after every
+   packing action, browser swaps it in.
+
+   Context: adventure, packing_items (list with category/claimed_name/claimed_by_attendee_id/quantity),
+            attendees (all RSVPs), my_rsvp (current user's attendee row).
+#}
+<div class="packing-card" id="packingCard">
+    <h2 class="packing-title">What to Bring</h2>
+    <p class="packing-intro">Potluck sign-up — claim what you’ll bring so nobody shows up with three potato salads.</p>
+
+    {# Add item form #}
+    <form method="POST" action="{{ url_for('packing_add', share_id=adventure.share_id) }}"
+          class="packing-add-form" data-packing-add>
+        <div class="packing-add-row">
+            <input type="text" name="label" maxlength="200" placeholder="e.g. Pumpkin pie" aria-label="Item to bring"
+                   required>
+            <select name="category" class="packing-category-select">
+                <option value="" disabled selected>Type of item</option>
+                <option value="appetizer">🥢 Appetizer</option>
+                <option value="main">🍗 Main</option>
+                <option value="side">🥗 Side</option>
+                <option value="dessert">🍰 Dessert</option>
+                <option value="drinks">🍹 Drinks</option>
+                <option value="other">🍽️ Other</option>
+            </select>
+            <button type="submit" class="btn packing-add-btn">Add</button>
+        </div>
+    </form>
+
+    {% if packing_items %}
+    <ul class="packing-board">
+        {% for item in packing_items %}
+        <li class="packing-item{% if item.claimed_by_attendee_id %} claimed{% endif %}"
+            data-item-id="{{ item.id }}"
+            data-claimed="{{ '1' if item.claimed_by_attendee_id else '0' }}">
+            <span class="packing-label">{{ item.label }}</span>
+            <span class="packing-category-badge category-{{ item.category }}">{{ item.category }}</span>
+            {% if item.quantity and item.quantity > 1 %}
+            <span class="packing-quantity">{{ item.quantity }}×</span>
+            {% endif %}
+
+            {% if item.claimed_by_attendee_id %}
+            <span class="packing-claimed">
+                <span class="packing-claimed-chip" title="Bringing this">
+                    🎒 {{ name_map.get(item.claimed_by_attendee_id, item.claimed_name) }}
+                </span>
+                <form method="POST" action="{{ url_for('packing_claim', share_id=adventure.share_id, item_id=item.id) }}"
+                      class="packing-claim-form" data-packing-claim>
+                    <select name="attendee_id" class="carpool-select" aria-label="Reassign {{ item.label }}">
+                        <option value="">Change to…</option>
+                        {% for a in attendees %}
+                        <option value="{{ a.id }}">{{ a.name }}{% if a.plus_one_name %} (+1 {{ a.plus_one_name }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-small packing-claim-btn">Reassign</button>
+                </form>
+                {% if my_rsvp and my_rsvp.id == item.claimed_by_attendee_id %}
+                <form method="POST" action="{{ url_for('packing_unclaim', share_id=adventure.share_id, item_id=item.id) }}"
+                      class="packing-unclaim-form" data-packing-unclaim>
+                    <button type="submit" class="btn btn-ghost btn-small" aria-label="Unclaim {{ item.label }}">
+                        I’ll bring it
+                    </button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('packing_unclaim', share_id=adventure.share_id, item_id=item.id) }}"
+                      class="packing-unclaim-form" data-packing-unclaim>
+                    <button type="submit" class="btn btn-ghost btn-small" aria-label="Unclaim {{ item.label }}">
+                        Remove claim
+                    </button>
+                </form>
+                {% endif %}
+            </span>
+            {% else %}
+            <span class="carpool-claim">
+                <form method="POST" action="{{ url_for('packing_claim', share_id=adventure.share_id, item_id=item.id) }}"
+                      class="packing-claim-form" data-packing-claim>
+                    {% if my_rsvp %}
+                    <input type="hidden" name="attendee_id" value="{{ my_rsvp.id }}">
+                    <button type="submit" class="btn btn-small packing-claim-btn" aria-label="Claim {{ item.label }}">
+                        I’ll bring {{ item.label }}
+                    </button>
+                    {% elif attendees %}
+                    {# No RSVP cookie (different device / cleared cookies), but
+                       the person is probably already on the list. Let them pick
+                       their name instead of blocking the claim. #}
+                    <select name="attendee_id" class="carpool-select" aria-label="Who is bringing {{ item.label }}" required>
+                        <option value="" disabled selected>Who are you?</option>
+                        {% for a in attendees %}
+                        <option value="{{ a.id }}">{{ a.name }}{% if a.plus_one_name %} (+1 {{ a.plus_one_name }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-small packing-claim-btn" aria-label="Claim {{ item.label }}">
+                        I’ll bring it
+                    </button>
+                    {% else %}
+                    <span class="packing-nobody">No one's RSVP'd yet — share the link!</span>
+                    {% endif %}
+                </form>
+            </span>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('packing_delete', share_id=adventure.share_id, item_id=item.id) }}"
+                  class="packing-delete-form" data-packing-delete>
+                <button type="submit" class="packing-delete-btn" aria-label="Remove {{ item.label }}">&times;</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="packing-empty">Nothing listed yet. Add what you’d like someone to bring — main dish, side, dessert, drinks.</p>
+    {% endif %}
+</div>

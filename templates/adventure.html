@@ -1,0 +1,444 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ adventure.name }} - Purbition{% endblock %}
+
+{% block og %}
+<meta property="og:site_name" content="Purbition">
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ adventure.name }}">
+<meta property="og:url" content="{{ share_url }}">
+<meta property="og:image" content="{{ og_image_url }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ og_image_url }}">
+{% set og_when -%}{{ adventure.date | day_name }}, {{ adventure.date | month_day }}{%- if end_date and end_date != adventure.date %} – {{ end_date | day_name }}, {{ end_date | month_day }}{% endif %}{%- if adventure.time %} · {{ adventure.time | format_time }}{%- if end_time %} – {{ end_time | format_time }}{% endif %}{%- else %} · All day{% endif %}{%- endset %}
+<meta property="og:description" content="{{ og_when }}{% if adventure.location %} · {{ adventure.location }}{% endif %}{% if adventure.description %} — {{ adventure.description }}{% endif %}">
+{% endblock %}
+
+{% macro initials(name) %}
+{%- set parts = name.split() -%}
+{%- if parts -%}{{ parts[0][0] | upper }}{%- endif -%}
+{%- if parts | length > 1 -%}{{ parts[-1][0] | upper }}{%- endif -%}
+{% endmacro %}
+
+{# WMO condition code -> inline SVG icon (stroke-based, matches lucide style) #}
+{% macro weather_icon(condition) %}
+{% if condition is not defined or condition == '' %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+{% elif 'clear' in condition.lower() or 'sunny' in condition.lower() %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+{% elif 'partly' in condition.lower() or 'mostly' in condition.lower() %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M17.5 18a4.5 4.5 0 0 0 .5-9 4.5 4.5 0 1 0 0 9Z"/></svg>
+{% elif 'cloud' in condition.lower() or 'overcast' in condition.lower() or 'fog' in condition.lower() or 'mist' in condition.lower() %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Z"/><path d="M9.5 17a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Z"/></svg>
+{% elif 'rain' in condition.lower() or 'drizzle' in condition.lower() %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 16a4.5 4.5 0 0 0 .5-9 4.5 4.5 0 1 0 0 9Z"/><path d="M8.5 16a4.5 4.5 0 0 0 0-9 4.5 4.5 0 1 0 0 9Z"/><path d="M12 20v-4M9.5 18.5l-1.5-2M14.5 18.5l1.5-2"/></svg>
+{% elif 'snow' in condition.lower() or 'sleet' in condition.lower() %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1"/></svg>
+{% elif 'thunder' in condition.lower() or 'storm' in condition.lower() %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 16a4.5 4.5 0 0 0 .5-9 4.5 4.5 0 1 0 0 9Z"/><path d="M9.5 16a4.5 4.5 0 0 0 0-9 4.5 4.5 0 1 0 0 9Z"/><path d="M13 12 9 16h4l-2 4 4-5h-4l2-3Z"/></svg>
+{% else %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+<article class="adventure-page">
+    <header class="adventure-cover{% if adventure.vibe %} cover-vibe-{{ adventure.vibe | lower }}{% endif %}{% if adventure.cover_image %} cover-has-image{% endif %}" aria-label="Cover for {{ adventure.name }}" style="{% if adventure.cover_image %}background-image: url('{{ adventure.cover_image }}');{% endif %}">
+        <a class="edit-link" href="{{ url_for('edit_adventure', share_id=adventure.share_id) }}">Edit</a>
+        {% if adventure.vibe %}<p class="cover-eyebrow">{{ vibe_label | upper }}</p>{% endif %}
+        <h1>{{ adventure.name }}</h1>
+        {% if adventure.vibe == 'thanksgiving' %}
+        <div class="thanksgiving-decoration" aria-hidden="true">🎃 🍁 🍂</div>
+        {% endif %}
+        <div class="cover-meta">
+            <span class="cal-tile" aria-hidden="true">
+                <span class="cal-month">{{ adventure.date | month_abbr }}</span>
+                <span class="cal-day">{{ adventure.date | day_num }}</span>
+            </span>
+            <span class="cover-meta-text">
+                <span class="meta-when">{{ adventure.date | day_name }}, {{ adventure.date | month_day }}{% if end_date and end_date != adventure.date %} – {{ end_date | day_name }}, {{ end_date | month_day }}{% endif %}<span class="meta-sep">&middot;</span>{% if adventure.time %}{{ adventure.time | format_time }}{% if end_time %} – {{ end_time | format_time }}{% endif %}{% else %}All day{% endif %}</span>
+                <span class="meta-loc">{{ adventure.location }}</span>
+                {% set cost_display = adventure.cost | display_cost -%}
+                {% if cost_display %}<span class="meta-cost">{{ cost_display }}</span>{% endif %}
+                {% if days_until is not none %}
+                <span class="meta-countdown">
+                    {% if days_until == 0 %}Today{% elif days_until == 1 %}Tomorrow{% else %}{{ days_until }} days{% endif %} until the event
+                </span>
+                {% endif %}
+            </span>
+        </div>
+
+    </header>
+
+    {# Add to Calendar — transparent popup overlay. Tapping shows Google Calendar
+       and .ics options in a centered popup with a dimmed backdrop. Does not
+       push page content down. #}
+    <div class="cal-menu-backdrop" id="calMenuBackdrop" hidden></div>
+    <div class="cal-menu" id="calMenu">
+        <button type="button" class="btn btn-soft cal-menu-btn" id="calMenuBtn"
+                aria-haspopup="true" aria-expanded="false"
+                data-ics="{{ url_for('calendar_ics', share_id=adventure.share_id) }}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>
+            Add to Calendar
+        </button>
+        <div class="cal-menu-pop" id="calMenuPop" role="menu" hidden>
+            <a class="cal-menu-item" role="menuitem" href="{{ google_cal_url }}" target="_blank" rel="noopener">
+                <span class="cal-menu-item-name">Google Calendar</span>
+                <span class="cal-menu-item-hint">Opens in a new tab</span>
+            </a>
+            <a class="cal-menu-item" role="menuitem" href="{{ url_for('calendar_ics', share_id=adventure.share_id) }}">
+                <span class="cal-menu-item-name">Apple / Outlook</span>
+                <span class="cal-menu-item-hint">Downloads .ics</span>
+            </a>
+        </div>
+    </div>
+
+    {% if adventure.description %}
+    <section class="adventure-card">
+        <h2 class="card-label">Details</h2>
+        <div class="adventure-description">
+            <p>{{ adventure.description }}</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="adventure-card">
+        <div class="card-head">
+            <div class="going-count">
+                <span class="count">{{ going_count }}</span>
+                <span class="label">{{ going_count == 1 and 'person going' or 'people going' }}</span>
+            </div>
+
+            {% set going_ppl = attendees | selectattr('status', 'equalto', 'going') | list %}
+            {% set more = going_ppl | length - 5 %}
+            {% if going_ppl %}
+            <div class="avatar-stack" id="avatarStack"
+                 aria-label="{{ going_ppl | length }} {{ 'person is' if going_ppl | length == 1 else 'people are' }} going">
+                {% for a in going_ppl | reverse %}
+                {% if loop.index <= 5 %}
+                <span class="avatar" title="{{ a.name }}">{{ initials(a.name) }}</span>
+                {% endif %}
+                {% endfor %}
+                {% if more > 0 %}
+                <span class="avatar avatar-more" title="{{ more }} {{ 'more person' if more == 1 else 'more people' }} going">+{{ more }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if adventure.carpool and going_ppl %}
+            {% include '_carpool_card.html' %}
+        {% endif %}
+
+        {% if attendees %}
+        <ul class="attendee-list">
+            {% for attendee in attendees %}
+            <li class="attendee attendee-{{ attendee.status }}">
+                <span class="attendee-name">{{ name_map.get(attendee.id, attendee.name) }}</span>
+                {% if attendee.status == 'going' and (attendee.plus_one_name if 'plus_one_name' in attendee.keys() else none) %}
+                <span class="plus-one-badge">+1 {{ attendee.plus_one_name }}</span>
+                {% endif %}
+                <span class="attendee-trailing">
+                    {% if attendee.status == 'going' and attendee.driving %}<span class="driver-chip" title="Driving">🚗</span>{% endif %}
+                    {% if attendee.status == 'going' and attendee.needs_ride and not (attendee.ride_with_driver_id if 'ride_with_driver_id' in attendee.keys() else none) %}<span class="needs-ride-chip" title="Needs a ride">🆘</span>{% endif %}
+                    {% if attendee.status == 'going' and (attendee.ride_with_driver_id if 'ride_with_driver_id' in attendee.keys() else none) %}
+                        {% for d in drivers %}
+                            {% if d.id == attendee.ride_with_driver_id %}
+                            <span class="riding-with-chip" title="Riding with {{ d.name }}">🚘 {{ d.initials }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    <span class="attendee-status status-{{ attendee.status }}">
+                        {% if attendee.status == 'going' %}Going{% elif attendee.status == 'interested' %}Interested{% else %}Can't go{% endif %}
+                    </span>
+                    <form method="POST" action="{{ url_for('delete_attendee_route', share_id=adventure.share_id, attendee_id=attendee.id) }}"
+                          class="attendee-delete-form" data-attendee="{{ attendee.name }}">
+                        <button type="submit" class="attendee-delete-btn" title="Remove {{ attendee.name }}"
+                                aria-label="Remove {{ attendee.name }}">×</button>
+                    </form>
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-attendees">No RSVPs yet. Be the first!</p>
+        {% endif %}
+    </section>
+
+    {% if (adventure.cost | display_cost) or cost_items %}
+    <section class="adventure-card cost-summary-card">
+        <h2 class="card-label">Estimated cost</h2>
+        <p class="cost-summary">
+            {%- if adventure.cost | display_cost %}{{ adventure.cost | display_cost }}{% endif -%}
+            {%- if going_count > 0 and cost_total and cost_items %} <span class="cost-per-person">· ~{{ cost_total | round(2) }} total ÷ {{ going_count }} going</span>{% endif %}
+        </p>
+    </section>
+    {% endif %}
+
+    {% if cost_items or (adventure.cost | display_cost) %}
+    <section class="adventure-card cost-card-section collapsible" data-collapsible="cost" aria-labelledby="costBreakdownLabel">
+        <button type="button" class="collapsible-head" data-collapsible-toggle="cost" aria-expanded="false" aria-controls="costBody">
+            <h2 class="card-label" id="costBreakdownLabel">Cost breakdown</h2>
+            <span class="collapsible-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="collapsible-body" id="costBody" hidden>
+            {% include '_cost_card.html' %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if show_splits %}
+    <section class="adventure-card splits-card-section collapsible" data-collapsible="splits" aria-labelledby="splitsLabel">
+        <button type="button" class="collapsible-head" data-collapsible-toggle="splits" aria-expanded="false" aria-controls="splitsBody">
+            <h2 class="card-label" id="splitsLabel">Split costs</h2>
+            <span class="collapsible-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="collapsible-body" id="splitsBody" hidden>
+            {{ splits_card|safe }}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if series %}
+    <section class="adventure-card series-card" aria-labelledby="seriesLabel">
+        <h2 class="card-label" id="seriesLabel">Part of a series</h2>
+        <ul class="series-list">
+            {% for s in series %}
+            <li class="series-item">
+                <a href="{{ url_for('view_adventure', share_id=s.share_id) }}">
+                    <span class="series-date">{{ s.date | day_short }}, {{ s.date | month_day }}</span>
+                    <span class="series-name">{{ s.name }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="series-actions">
+            <a class="btn btn-soft" href="{{ url_for('edit_series_future', share_id=adventure.share_id) }}">Edit all future occurrences</a>
+            <form method="POST" action="{{ url_for('cancel_series_future', share_id=adventure.share_id) }}"
+                  class="series-cancel-form" data-series-cancel>
+                <button type="submit" class="btn btn-ghost series-cancel-btn">Cancel all future occurrences</button>
+            </form>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if weather_days or weather_not_available %}
+    {% set target_day = weather %}
+    <section class="adventure-card weather-card" aria-labelledby="weatherLabel">
+        <div class="weather-header">
+            <h2 class="card-label weather-head" id="weatherLabel">Weather</h2>
+            {% if weather_lat and weather_lon %}
+            <a class="weather-maps-link" href="https://www.google.com/maps?q={{ weather_lat }},{{ weather_lon }}" target="_blank" rel="noopener" title="Open in Google Maps">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="14" height="14"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                Maps
+            </a>
+            {% endif %}
+        </div>
+
+        {% if weather_not_available %}
+        <div class="weather-comingsoon">
+            <div class="weather-comingsoon-icon">{% if condition is defined %}{{ weather_icon(condition) }}{% else %}{{ weather_icon('cloud') }}{% endif %}</div>
+            <div class="weather-comingsoon-text">
+                <span class="weather-comingsoon-title">Forecast not available yet</span>
+                <span class="weather-comingsoon-sub">Weather forecasts are only available within about 2 weeks of the event. Check back closer to the date.</span>
+            </div>
+        </div>
+        {% else %}
+
+        {# Hero day — default is the adventure's target date, or the first available.
+           Updated client-side when a day in the strip below is clicked. #}
+        {% if target_day %}
+        <div class="weather-hero" id="weatherHero"
+             data-day-date="{{ target_day.date }}">
+            <div class="weather-hero-icon" id="weatherHeroIcon">{{ weather_icon(target_day.condition) }}</div>
+            <div class="weather-hero-info">
+                <span class="weather-hero-day" id="weatherHeroDay">{{ target_day.day_label }}</span>
+                <span class="weather-hero-condition" id="weatherHeroCondition">{{ target_day.condition }}</span>
+            </div>
+            <div class="weather-hero-temp">
+                <span class="weather-temp" id="weatherHeroHigh">{{ target_day.high_f }}&deg;</span>
+                <span class="weather-temp-low" id="weatherHeroLow">{{ target_day.low_f }}&deg;</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if weather_summary %}
+        <div class="weather-trip-summary">{{ weather_summary }}</div>
+        {% endif %}
+
+        {# Multi-day strip — show all available days in range. Click a day to
+           promote it to the hero. No day is pre-highlighted so the strip
+           reads as a clean picker. #}
+        {% if weather_days | length > 1 %}
+        <div class="weather-strip" id="weatherStrip" role="tablist" aria-label="Select a day to see its forecast">
+            {% for day in weather_days %}
+            <button type="button" class="weather-day{% if day.in_event is not defined or day.in_event %} weather-day-event{% else %} weather-day-context{% endif %}" role="tab"
+                    data-day-date="{{ day.date }}"
+                    data-day-icon="{{ weather_icon(day.condition) | replace('"', '&quot;') }}"
+                    data-day-label="{{ day.day_label }}"
+                    data-day-condition="{{ day.condition }}"
+                    data-day-high="{{ day.high_f }}"
+                    data-day-low="{{ day.low_f }}"
+                    aria-label="{{ day.day_label }}, high {{ day.high_f }} low {{ day.low_f }}{% if day.rain_pct > 20 %}, {{ day.rain_pct }}% chance of rain{% endif %}"
+                    aria-selected="false">
+                <span class="weather-strip-day">{{ day.date | month_abbr }} {{ day.date | day_num }}</span>
+                <div class="weather-strip-icon">{{ weather_icon(day.condition) }}</div>
+                <span class="weather-strip-hi">{{ day.high_f }}&deg;</span>
+                <span class="weather-strip-lo">{{ day.low_f }}&deg;</span>
+                {% if day.rain_pct > 20 %}
+                <span class="weather-strip-rain">{{ day.rain_pct }}%</span>
+                {% endif %}
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if adventure.packing_list %}
+    <section class="adventure-card">
+        <h2 class="card-label">Packing checklist</h2>
+        <ul class="packing-list" data-share-id="{{ adventure.share_id }}">
+            {% for item in adventure.packing_list.splitlines() if item.strip() %}
+            <li><label><input type="checkbox" data-packing-item="{{ loop.index0 }}"><span>{{ item.strip() }}</span></label></li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {% if show_packing %}
+    <section class="adventure-card packing-card-section collapsible" data-collapsible="gear" aria-labelledby="gearLabel">
+        <button type="button" class="collapsible-head" data-collapsible-toggle="gear" aria-expanded="false" aria-controls="gearBody">
+            <h2 class="card-label" id="gearLabel">Shared Items</h2>
+            <span class="collapsible-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="collapsible-body" id="gearBody" hidden>
+            {{ packing_card|safe }}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="adventure-actions" aria-label="RSVP">
+        <h2 class="card-label" id="rsvpLabel">{% if my_rsvp %}Your RSVP{% else %}RSVP{% endif %}</h2>
+
+        <form method="POST" action="{{ url_for('rsvp', share_id=adventure.share_id) }}" class="rsvp-form" id="rsvpForm">
+            {% if not my_rsvp %}
+            <div class="form-group rsvp-name-group" id="rsvpNameGroup">
+                <label for="attendeeName">Your name</label>
+                <input type="text" id="attendeeName" name="name" required maxlength="100"
+                       placeholder="Your name" autocomplete="name"
+                       data-share-id="{{ adventure.share_id }}"
+                       data-rsvp-name>
+            </div>
+
+            {# Plus-one — only for Going RSVPs. Checkbox + name field. #}
+            <div class="form-group plus-one-group" id="plusOneGroup" hidden>
+                <div class="plus-one-toggle">
+                    <input type="checkbox" id="plusOneToggle" name="plus_one_toggle">
+                    <label for="plusOneToggle">I'm bringing a +1 guest</label>
+                </div>
+                <div class="plus-one-name-field" hidden>
+                    <label for="plusOneName">Their name</label>
+                    <input type="text" id="plusOneName" name="plus_one_name" maxlength="100"
+                           placeholder="e.g. Sarah" autocomplete="name">
+                </div>
+            </div>
+            {% else %}
+            <input type="hidden" name="name" value="{{ my_rsvp.name }}">
+            <p class="my-rsvp-note">
+                You're on the list as <strong>{{ my_rsvp.name }}</strong>
+                {% if my_rsvp.plus_one_name %}
+                <span class="plus-one-badge">+1 {{ my_rsvp.plus_one_name }}</span>
+                {% endif %}
+                <span class="my-rsvp-says">({% if my_rsvp.status == 'going' %}Going{% elif my_rsvp.status == 'interested' %}Interested{% else %}Can't go{% endif %})</span>
+            </p>
+            {% endif %}
+
+            <div class="status-group" role="group" aria-label="Change your RSVP">
+                {% for value, label in [('going', "I'm Going"), ('interested', 'Interested'), ('cant', "Can't Go")] %}
+                <button type="submit" name="status" value="{{ value }}"
+                        class="btn status-btn{{ ' active' if my_rsvp and my_rsvp.status == value else '' }}"
+                        data-status="{{ value }}"
+                        aria-pressed="{{ 'true' if my_rsvp and my_rsvp.status == value else 'false' }}">{{ label }}</button>
+                {% endfor %}
+            </div>
+
+            {% if adventure.carpool %}
+            <div class="drive-group" id="driveGroup"{% if my_rsvp and my_rsvp.status != 'going' %} hidden{% endif %}>
+                <label class="drive-toggle">
+                    <input type="checkbox" name="driving" value="1"
+                           id="drivingToggle"
+                           {% if my_rsvp and my_rsvp.driving %} checked{% endif %}>
+                    <span>I'm driving</span>
+                </label>
+                <div class="drive-details" id="driveDetails"
+                     {% if not (my_rsvp and my_rsvp.driving) %}hidden{% endif %}>
+                    <div class="form-row drive-details-row">
+                        <div class="form-group">
+                            <label for="seats">Seats</label>
+                            <input type="number" id="seats" name="seats" min="1" max="15"
+                                   value="{{ my_rsvp.seats if my_rsvp and 'seats' in my_rsvp.keys() and my_rsvp.seats else 3 }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="departure_time">Leave at</label>
+                            <input type="time" id="departure_time" name="departure_time"
+                                   value="{{ my_rsvp.departure_time if my_rsvp and 'departure_time' in my_rsvp.keys() and my_rsvp.departure_time else '' }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="departure_location">Leaving from</label>
+                        <input type="text" id="departure_location" name="departure_location" maxlength="200"
+                               placeholder="My place, 9th & 9th"
+                               value="{{ my_rsvp.departure_location if my_rsvp and 'departure_location' in my_rsvp.keys() and my_rsvp.departure_location else '' }}">
+                    </div>
+                </div>
+                <label class="drive-toggle needs-ride-toggle" id="needsRideToggleWrap"
+                       {% if my_rsvp and my_rsvp.driving %}hidden{% endif %}>
+                    <input type="checkbox" name="needs_ride" value="1"
+                           {% if my_rsvp and my_rsvp.needs_ride %} checked{% endif %}>
+                    <span>I need a ride</span>
+                </label>
+            </div>
+            {% endif %}
+        </form>
+
+        <div class="secondary-actions">
+            {% set opener = adventure.tagline or 'Come on!' %}
+            {% if is_multi_day %}
+                {% set date_str = (adventure.date | day_short) ~ ", " ~ (adventure.date | month_day) ~ " – " ~ (end_date | day_short) ~ ", " ~ (end_date | month_day) %}
+            {% else %}
+                {% set date_str = (adventure.date | day_short) ~ ", " ~ (adventure.date | month_day) %}
+            {% endif %}
+            {% set details = opener ~ " " ~ adventure.name ~ " — " ~ date_str ~ " · " ~ ((adventure.time | format_time) if adventure.time else "All day") %}
+            {% set share_text = details %}
+            {% set imessage_body = details ~ "\n" ~ share_url %}
+            <div class="share-dropdown">
+                    <button type="button" class="btn btn-soft btn-block" id="shareBtn" data-url="{{ share_url }}" data-message="{{ share_text | urlencode }}">
+                        Share Event
+                    </button>
+                    <div class="share-popover" id="sharePopover" hidden>
+                        <button type="button" class="share-option" onclick="navigator.clipboard.writeText('{{ share_url }}').then(() => showToast('Link copied!'))">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                            Copy link
+                        </button>
+                        <a class="share-option" href="sms:&body={{ (imessage_body | urlencode) | replace('+', '%20') }}">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18V3H3zm11 14h3a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-3v-3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h3v3a1 1 0 0 0 1 1zm11-11h3a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-3v3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h3v-3a1 1 0 0 0-1-1h-3v-3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h11v3a1 1 0 0 0-1-1h-3v-3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h3z"/><path d="M21 14v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5"/></svg>
+                            Send via iMessage
+                        </a>
+                    </div>
+                </div>
+        </div>
+    </section>
+
+    <form method="POST" action="{{ url_for('delete_adventure_route', share_id=adventure.share_id) }}"
+          class="delete-form" id="deleteForm">
+        <button type="submit" class="btn btn-ghost delete-btn">
+            Delete this event
+        </button>
+    </form>
+</article>
+{% endblock %}

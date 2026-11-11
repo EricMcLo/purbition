@@ -1,0 +1,125 @@
+{# Cost splits card — single source of truth.
+   Rendered by the server on page load AND returned as an HTML fragment after
+   every splits action (add/delete expense, edit Venmo, opt in/out of split).
+   The browser just inserts this HTML; it never re-derives the markup itself.
+
+   Context: adventure, expenses (list of dicts with payer_name), splits
+   (compute_splits() result), attendees (with venmo_handle + splits fields).
+#}
+{% set cp_url = url_for('expense_add', share_id=adventure.share_id) %}
+{% set all_attendees = attendees %}
+{% set going_attendees = attendees | selectattr('status', 'equalto', 'going') | list %}
+{% set has_split_data = expenses and expenses | length > 0 %}
+
+<div class="splits-card" id="splitsCard">
+    {% if has_split_data %}
+    <div class="splits-summary">
+        <span class="splits-total"><strong>${{ '%.2f' | format(splits.total) }}</strong> spent</span>
+        {% if splits.splitter_ids %}
+        <span class="splits-share">· ${{ '%.2f' | format(splits.per_share) }} each · {{ splits.splitter_ids | length }} splitting</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if expenses %}
+    <ul class="expense-list">
+        {% for e in expenses %}
+        <li class="expense-item" data-expense-id="{{ e.id }}">
+            <span class="expense-payer">{{ name_map.get(e.paid_by_attendee_id, e.payer_name) }}</span>
+            <span class="expense-action">paid</span>
+            <span class="expense-amount">{{ e.amount }}</span>
+            <span class="expense-for">for {{ e.label }}</span>
+            <form method="POST" action="{{ url_for('expense_delete', share_id=adventure.share_id, expense_id=e.id) }}"
+                  class="expense-delete-form" data-expense-delete>
+                <button type="submit" class="expense-delete-btn" aria-label="Remove {{ e.label }}">&times;</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="splits-empty">No expenses yet. Add what someone paid for — groceries, gas, the Airbnb — and we'll split it.</p>
+    {% endif %}
+
+    {# Add expense form — 'who paid' lists ALL attendees so the host can log a
+       payment before the payer has RSVP'd 'Going'. #}
+    {% if all_attendees %}
+    <form method="POST" action="{{ cp_url }}" class="expense-add-form" data-expense-add>
+        <select name="paid_by" class="expense-payer-select" required aria-label="Who paid">
+            <option value="" disabled selected>Who paid?</option>
+            {% for a in all_attendees %}
+            <option value="{{ a.id }}">{{ name_map.get(a.id, a.name) }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="label" maxlength="200" placeholder="What for? (e.g. Groceries)" aria-label="What for?" required>
+        <input type="text" name="amount" maxlength="100" placeholder="$ amount" aria-label="Amount" required>
+        <button type="submit" class="btn expense-add-btn">Add expense</button>
+    </form>
+    <p class="splits-hint">Anyone with the link can add or remove a line.</p>
+    {% endif %}
+
+    {# Per-attendee Venmo handles + splits opt-out toggle #}
+    {% if going_attendees %}
+    <div class="venmo-list">
+        <p class="venmo-list-label">Venmo handles <span class="venmo-list-sub">(stored per-person, just for this trip)</span></p>
+        <ul class="venmo-items">
+            {% for a in going_attendees %}
+            <li class="venmo-item" data-attendee-id="{{ a.id }}">
+                <span class="venmo-name">{{ name_map.get(a.id, a.name) }}</span>
+                <form method="POST" action="{{ url_for('attendee_venmo', share_id=adventure.share_id, attendee_id=a.id) }}"
+                      class="venmo-form" data-venmo-form>
+                    <input type="text" name="venmo" maxlength="100"
+                           placeholder="@handle" value="{{ a.venmo_handle or '' }}"
+                           aria-label="Venmo handle for {{ name_map.get(a.id, a.name) }}" class="venmo-input">
+                    <button type="submit" class="btn btn-small venmo-save-btn">Save</button>
+                </form>
+                <form method="POST" action="{{ url_for('attendee_splits', share_id=adventure.share_id, attendee_id=a.id) }}"
+                      class="splits-toggle-form" data-splits-toggle>
+                    <button type="submit" class="btn btn-small splits-toggle-btn {% if not a.splits %}splits-out{% endif %}"
+                            aria-label="Toggle whether {{ name_map.get(a.id, a.name) }} is in the equal split">
+                        {% if a.splits %}In split{% else %}Opted out{% endif %}
+                    </button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {# Per-person balances + Venmo deeplinks (only when there are expenses) #}
+    {% if has_split_data and splits.splitter_ids %}
+    <div class="splits-balances">
+        <p class="splits-balances-label">Who owes whom</p>
+        <ul class="splits-balance-list">
+            {% for r in splits.rows %}
+            {% set my_debts = splits.owes_map.get(r.attendee_id, []) %}
+            <li class="splits-balance-row {% if r.net > 0.005 %}is-owed{% elif r.net < -0.005 %}owes{% else %}is-even{% endif %}">
+                <span class="splits-balance-name">{{ r.name }}</span>
+                <span class="splits-balance-net">
+                    {% if r.net > 0.005 %}+${{ '%.2f' | format(r.net) }} <span class="splits-balance-tag">owed</span>
+                    {% elif r.net < -0.005 %}-${{ '%.2f' | format(-r.net) }} <span class="splits-balance-tag">owes</span>
+                    {% else %}even{% endif %}
+                </span>
+                {% if my_debts %}
+                <div class="splits-venmo-actions">
+                    {% for (creditor_id, amt) in my_debts %}
+                        {% set creditor = (splits.rows | selectattr('attendee_id', 'equalto', creditor_id) | first) %}
+                        {% set note = (adventure.name | default('Adventure'))[:60] %}
+                        {% if creditor and creditor.venmo_handle %}
+                            <a class="btn btn-soft btn-small venmo-btn"
+                               href="{{ (creditor.venmo_handle, amt, r.name + ' owes ' + creditor.name + ' for ' + note) | venmo_deeplink }}">
+                                Venmo {{ creditor.name }} ${{ '%.2f' | format(amt) }}
+                            </a>
+                        {% else %}
+                            <span class="venmo-missing" title="Add {{ creditor.name }}'s @handle to enable the Venmo button">
+                                ${{ '%.2f' | format(amt) }} to {{ creditor.name }} <span class="venmo-missing-note">(needs @handle)</span>
+                            </span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>

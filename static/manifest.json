@@ -1,0 +1,18 @@
+{
+  "name": "Purbition",
+  "short_name": "Purbition",
+  "description": "Make it easier for people to actually do things together",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f3f0",
+  "theme_color": "#5a635c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

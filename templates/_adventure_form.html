@@ -1,0 +1,159 @@
+<form method="POST" action="{{ form_action }}" class="adventure-form" novalidate>
+    {% if series_mode %}
+    <div class="series-mode-banner" role="status">
+        <strong>Editing all future occurrences</strong> — changes here apply to this date and every later occurrence in the series.
+        {%- if future_count %} That's <strong>{{ future_count }}</strong> occurrence{{ '' if future_count == 1 else 's' }}.{% endif %}
+        Date and end-date stay per-occurrence.
+    </div>
+    {% endif %}
+    <div class="form-group">
+        <label for="name">Event Name <span class="required">*</span></label>
+        <input type="text" id="name" name="name" required maxlength="200"
+               placeholder="Lake Blanche Hike"
+               value="{{ name or '' }}">
+        <span class="help-text">e.g., Lake Blanche Hike, Saturday Ski Day</span>
+    </div>
+
+    <div class="form-group">
+        <label>Category <span class="optional">(optional)</span></label>
+        <div class="category-picker">
+            {% for group in vibe_groups %}
+            <div class="category-group">
+                <span class="category-group-label">{{ group.label }}</span>
+                <div class="category-options">
+                    {% for v in group.choices %}
+                    <button type="button" class="category-opt{{ ' selected' if vibe == v.id else '' }}"
+                            data-vibe="{{ v.id }}" aria-pressed="{{ 'true' if vibe == v.id else 'false' }}">
+                        <span class="category-opt-icon">{{ v.icon | safe }}</span>
+                        <span class="category-opt-title">{{ v.label }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <input type="hidden" name="vibe" id="categoryPickerInput" value="{{ vibe or '' }}">
+        <span class="help-text">Picks the theme and lets friends know the vibe at a glance</span>
+    </div>
+
+    {% if not series_mode %}
+    <div class="form-row">
+        <div class="form-group">
+            <label for="date">Date <span class="required">*</span></label>
+            <input type="date" id="date" name="date" required
+                   value="{{ date or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="time">Time</label>
+            <input type="time" id="time" name="time"
+                   value="{{ time or '' }}">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="end_date">End date <span class="optional">(multi-day)</span></label>
+            <input type="date" id="end_date" name="end_date"
+                   value="{{ end_date or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="end_time">End time</label>
+            <input type="time" id="end_time" name="end_time"
+                   value="{{ end_time or '' }}">
+        </div>
+    </div>
+    <span class="help-text">Leave both blank for a single-day event. End time only matters if you also set an end date.</span>
+    {% else %}
+    <div class="form-row">
+        <div class="form-group">
+            <label>Time <span class="optional">(applies to all)</span></label>
+            <input type="time" id="time" name="time" value="{{ time or '' }}">
+        </div>
+        <div class="form-group">
+            <label>End time <span class="optional">(applies to all)</span></label>
+            <input type="time" id="end_time" name="end_time" value="{{ end_time or '' }}">
+        </div>
+    </div>
+    <span class="help-text">Each occurrence keeps its own date and end-date — only the time is shared across the series.</span>
+    {% endif %}
+
+    <div class="form-group">
+        <label for="location">Location <span class="required">*</span></label>
+        <input type="text" id="location" name="location" required maxlength="200"
+               placeholder="Millcreek Canyon"
+               value="{{ location or '' }}">
+        <span class="help-text">e.g., Millcreek Canyon, Brighton Resort</span>
+    </div>
+
+    <div class="form-group">
+        <label for="description">What to bring / notes</label>
+        <textarea id="description" name="description" maxlength="2000"
+                  rows="4" placeholder="Water, snacks, layers, headlamp...">{{ description or '' }}</textarea>
+        <span class="help-text">Optional details for attendees</span>
+    </div>
+
+    <div class="form-group">
+        <label for="packing_list">Packing checklist <span class="optional">(one item per line)</span></label>
+        <textarea id="packing_list" name="packing_list" maxlength="2000"
+                  rows="4" placeholder="Water&#10;Snacks&#10;Sunscreen">{{ packing_list or '' }}</textarea>
+        <span class="help-text">Optional — attendees will see a tick-able checklist</span>
+    </div>
+
+    <div class="form-group">
+        <label for="tagline">Share one-liner <span class="optional">(optional)</span></label>
+        <input type="text" id="tagline" name="tagline" maxlength="200"
+               placeholder="Who's in for the desert?" value="{{ tagline or '' }}">
+        <span class="help-text">Used when you forward the link. Leave blank for a default "Come on!"</span>
+    </div>
+
+    <div class="form-group">
+        <label for="cost">Estimated cost <span class="optional">(per person, optional)</span></label>
+        <input type="text" id="cost" name="cost" maxlength="100"
+               placeholder="~$40/person or $20 gas each" value="{{ cost or '' }}">
+        <span class="help-text">So people can plan for splitting an Airbnb, gas, groceries, etc.</span>
+    </div>
+
+    <div class="form-group">
+        <label class="form-check">
+            <input type="checkbox" name="carpool" value="1"{% if carpool %} checked{% endif %}>
+            <span>Carpooling — people can offer rides</span>
+        </label>
+        <span class="help-text">Off by default. Tick it for trips where everyone rides together</span>
+    </div>
+
+    <div class="form-group">
+        <label class="form-check">
+            <input type="checkbox" name="show_weather" value="1"{% if show_weather is defined and show_weather %} checked{% elif show_weather is not defined %} checked{% endif %}>
+            <span>Show weather for this location</span>
+        </label>
+        <span class="help-text">Forecast from Open-Meteo. Uncheck for indoor plans like board-game nights.</span>
+    </div>
+
+    <div class="form-group">
+        <label class="form-check">
+            <input type="checkbox" name="show_splits" value="1"{% if show_splits is defined and show_splits %} checked{% endif %}>
+            <span>Split costs with Venmo — who paid what, who owes what</span>
+        </label>
+        <span class="help-text">Off by default. Tick it for trips with shared money (Airbnb, gas, groceries).</span>
+    </div>
+
+    <div class="form-group">
+        <label class="form-check">
+            <input type="checkbox" name="show_gear" value="1"{% if show_gear is defined and show_gear %} checked{% endif %}>
+            <span>Shared items — a shared checklist people can claim</span>
+        </label>
+        <span class="help-text">Off by default. Tick it for trips that need shared gear (stoves, coolers, tents).</span>
+    </div>
+
+    <div class="form-group">
+        <label for="cover_image">Cover image URL <span class="optional">(optional)</span></label>
+        <input type="text" id="cover_image" name="cover_image" maxlength="500"
+               placeholder="https://example.com/your-photo.jpg" value="{{ cover_image or '' }}">
+        <span class="help-text">A photo URL that shows behind the event title on the cover.</span>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-large">{{ submit_label }}</button>
+        <a href="{{ cancel_url }}" class="btn btn-secondary btn-large">Cancel</a>
+    </div>
+</form>

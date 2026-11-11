@@ -1,0 +1,42 @@
+{# Cost breakdown card — single source of truth.
+   Rendered by the server on page load AND returned as an HTML fragment after
+   every cost action (see the /cost/add and /cost/delete routes). The browser
+   just inserts this HTML; it never re-derives the markup itself, so the card
+   can't drift between the template and JS.
+
+   Context: adventure (row used for url_for only), cost_items (list), cost_total.
+#}
+{% set cp_url = url_for('cost_add', share_id=adventure.share_id) %}
+
+<div class="cost-card" id="costCard" data-add-url="{{ cp_url }}">
+    <div class="cost-card-head">
+        <p class="cost-card-title">Cost breakdown</p>
+        {% if cost_items %}
+        <p class="cost-card-total"><span>Total</span>{{ cost_total | round(2) }}</p>
+        {% endif %}
+    </div>
+
+    {% if cost_items %}
+    <ul class="cost-list">
+        {% for it in cost_items %}
+        <li class="cost-item" data-item-id="{{ it.id }}">
+            <span class="cost-label">{{ it.label }}</span>
+            <span class="cost-amount">{{ it.amount }}</span>
+            <form method="POST" action="{{ url_for('cost_delete', share_id=adventure.share_id, item_id=it.id) }}"
+                  class="cost-delete-form" data-cost-delete>
+                <button type="submit" class="cost-delete-btn" aria-label="Remove {{ it.label }}">&times;</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="cost-empty">No items yet — add what the trip costs to split.</p>
+    {% endif %}
+
+    <form method="POST" action="{{ cp_url }}" class="cost-add-form" data-cost-add>
+        <input type="text" name="label" maxlength="200" placeholder="Item (e.g. Airbnb, gas, groceries)" aria-label="Item name" required>
+        <input type="text" name="amount" maxlength="100" placeholder="$ amount" aria-label="Amount" required>
+        <button type="submit" class="btn cost-add-btn">Add</button>
+    </form>
+    <p class="cost-hint">Anyone with the link can add or remove a line.</p>
+</div>

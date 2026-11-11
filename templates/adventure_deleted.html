@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ adventure.name }} — Deleted{% endblock %}
+
+{% block content %}
+<article class="adventure-page">
+    <header class="adventure-cover" aria-label="{{ adventure.name }} (deleted)">
+        <p class="cover-eyebrow">DELETED</p>
+        <h1>{{ adventure.name }}</h1>
+        <div class="cover-meta">
+            <span class="cover-meta-text">
+                <span class="meta-when">{{ adventure.date | day_name }}, {{ adventure.date | month_day }}</span>
+                <span class="meta-loc">{{ adventure.location }}</span>
+            </span>
+        </div>
+    </header>
+
+    <section class="adventure-card">
+        <h2 class="card-label">This event was deleted</h2>
+        <div class="adventure-description">
+            <p>Someone removed this plan. If that was a mistake, you can restore it within 24 hours.</p>
+        </div>
+        <form method="POST" action="{{ url_for('undo_adventure_route', share_id=adventure.share_id) }}" class="undo-form">
+            <button type="submit" class="btn btn-primary btn-block">Undo — Restore this event</button>
+        </form>
+    </section>
+
+    <p class="deleted-note">After 24 hours the event and its RSVPs are permanently removed.</p>
+</article>
+{% endblock %}

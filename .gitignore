@@ -1,0 +1,12 @@
+# Secrets
+.env
+
+# Local development
+venv/
+__pycache__/
+*.pyc
+database.db
+.DS_Store
+
+# Scratch files and local debug output
+tmp/

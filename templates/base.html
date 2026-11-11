@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        /* Apply the saved theme + color palette before first paint (no flash).
+           No saved choice = follow the OS theme and the default Basalt Smoke
+           palette. */
+        (function () {
+            try {
+                var t = localStorage.getItem('adventure-theme');
+                if (t === 'dark') {
+                    document.documentElement.dataset.theme = 'dark';
+                } else if (t === 'light') {
+                    document.documentElement.dataset.theme = 'light';
+                }
+                var p = localStorage.getItem('adventure-palette');
+                if (p) {
+                    document.documentElement.dataset.palette = p;
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <title>{% block title %}Purbition{% endblock %}</title>
+    <meta name="description" content="Make it easier for people to actually do things together">
+    {% block og %}{% endblock %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ static_version }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='palettes.css') }}?v={{ static_version }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.svg') }}">
+    <meta name="theme-color" content="#5a635c">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.9-5.5 10.2-7.4 11.8a1 1 0 0 1-1.2 0C9.5 20.2 4 14.9 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                </span>
+                <span class="brand-name">Purbition</span>
+            </a>
+            <div class="appearance-wrap">
+                <a class="header-link" href="{{ url_for('manage') }}">Manage</a>
+                <button class="appearance-toggle" type="button" aria-label="Change appearance" title="Change appearance" aria-haspopup="true" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a10 10 0 1 1 10-10"/><path d="M12 22a10 10 0 0 1-8.5-14.5"/><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+                </button>
+                <div class="appearance-panel" role="dialog" aria-label="Appearance">
+                    <div class="appearance-section">
+                        <span class="appearance-label">Theme</span>
+                        <div class="appearance-pills" role="radiogroup" aria-label="Theme">
+                            <button type="button" class="appearance-pill" data-theme-choice="light" role="radio" aria-checked="false">
+                                <span>Light</span>
+                            </button>
+                            <button type="button" class="appearance-pill" data-theme-choice="dark" role="radio" aria-checked="false">
+                                <span>Dark</span>
+                            </button>
+                            <button type="button" class="appearance-pill" data-theme-choice="system" role="radio" aria-checked="false">
+                                <span>System</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="appearance-section">
+                        <span class="appearance-label">Color</span>
+                        <div class="appearance-swatches" role="radiogroup" aria-label="Color palette"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>&copy; 2026 Purbition &middot; Weather data by <a href="https://open-meteo.com/" rel="noopener" target="_blank">Open-Meteo</a> (CC BY 4.0)</p>
+        </div>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="{{ url_for('static', filename='app.js') }}?v={{ static_version }}"></script>
+</body>
+</html>

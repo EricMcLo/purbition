@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage - Purbition{% endblock %}
+
+{% block content %}
+<section class="manage">
+  <div class="manage-head">
+    <h1 class="page-title">Manage events</h1>
+    <p class="manage-sub">Every event, newest first, including deleted ones. Use this to spot and clear test junk before sharing the link. Actions are the same as on each page.</p>
+  </div>
+
+  {% if not items %}
+    <p class="empty-state">No events yet.</p>
+  {% else %}
+    <ul class="manage-list">
+      {% for it in items %}
+        {% set a = it.adventure %}
+        <li class="manage-row {{ 'is-deleted' if it.deleted }}">
+          <div class="manage-main">
+            <span class="manage-name">
+              {{ a.name }}{% if it.deleted %}<span class="deleted-badge">deleted</span>{% endif %}
+            </span>
+            <span class="manage-meta">
+              {%- if a.date %}{{ a.date | day_name }}, {{ a.date | month_day }}{% if it.end_date %} – {{ it.end_date | day_name }}, {{ it.end_date | month_day }}{% endif %}{% endif -%}
+              {%- if a.time %} · {{ a.time | format_time }}{% if it.end_time %} – {{ it.end_time | format_time }}{% endif %}{% endif -%}
+              {%- if a.location %} · {{ a.location }}{% endif -%}
+            </span>
+            <span class="manage-counts">
+              <span class="count going">{{ a.going_count }} going</span>
+              <span class="count total">{{ a.total_attendees }} total RSVPs</span>
+            </span>
+          </div>
+          <div class="manage-actions">
+            <a class="btn btn-ghost btn-small" href="{{ url_for('view_adventure', share_id=a.share_id) }}">Open</a>
+            {% if it.deleted %}
+              <form method="post" action="{{ url_for('undo_adventure_route', share_id=a.share_id) }}" class="manage-form">
+                <button type="submit" class="btn btn-soft btn-small">Undo delete</button>
+              </form>
+            {% else %}
+              <button type="button" class="btn btn-soft btn-small manage-copy-link"
+                      data-share-url="{{ it.share_url }}" data-label="{{ a.name }}">Copy link</button>
+              <form method="post" action="{{ url_for('delete_adventure_route', share_id=a.share_id) }}" class="manage-form"
+                    data-confirm-delete="{{ a.name }}">
+                <button type="submit" class="btn btn-danger btn-small">Delete</button>
+              </form>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}

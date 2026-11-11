@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Purbition - Home{% endblock %}
+
+{% macro adventure_card(a, vibe_labels) %}
+<article class="index-card">
+    <a class="card-link" href="{{ url_for('view_adventure', share_id=a.row.share_id) }}">
+        <h4>{{ a.row.name }}</h4>
+        <p class="card-date">{{ a.row.date | month_abbr }} {{ a.row.date | day_num }}{% if a.end_date %} – {{ a.end_date | month_abbr }} {{ a.end_date | day_num }}{% endif %}{% if a.row.time %}<span class="meta-sep">&middot;</span>{{ a.row.time | format_time }}{% endif %}{% if a.row.vibe %}<span class="card-vibe">{{ vibe_labels.get(a.row.vibe, a.row.vibe) }}</span>{% endif %}</p>
+        <p class="card-loc">{{ a.row.location }}</p>
+        {% if a.row.cost | display_cost %}<p class="card-cost">{{ a.row.cost | display_cost }}</p>{% endif %}
+        {% if a.row.description %}
+        <p class="adventure-desc">{{ a.row.description }}</p>
+        {% endif %}
+        <div class="card-footer">
+            {% if a.relative %}<span class="card-relative">{{ a.relative }}</span>{% endif %}
+            {% set gc = a.row.going_count or 0 -%}
+            {% set ic = a.row.interested_count or 0 -%}
+            {% if gc %}
+            <span class="card-going">{{ gc }} {{ 'going' if gc == 1 else 'going' }}{% if ic %}<span class="card-interest"> &middot; {{ ic }} interested</span>{% endif %}</span>
+            {% elif ic %}
+            <span class="card-interest">{{ ic }} interested</span>
+            {% endif %}
+            <span class="card-go">View adventure</span>
+        </div>
+    </a>
+</article>
+{% endmacro %}
+
+{% block content %}
+<section class="hero rise-in">
+    <p class="eyebrow">Make it easier to actually do things together</p>
+    <h2>Do things <em>together.</em></h2>
+    <p class="hero-sub">Plan a hike, ski day, climb, bike ride, or anything else. Share the link. Everyone sees the same plan.</p>
+    <a href="{{ url_for('create_form') }}" class="btn btn-primary btn-large">Create an Event</a>
+</section>
+
+{% if adventures %}
+<section class="recent-adventures">
+    <div class="section-header">
+        <h3>Upcoming Events</h3>
+    </div>
+    <div class="adventure-grid">
+        {% for a in adventures %}{{ adventure_card(a, vibe_labels) }}{% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if past %}
+<section class="recent-adventures past-adventures">
+    <hr class="section-divider">
+    <div class="section-header">
+        <h3>Past events</h3>
+        <span class="section-count">{{ past | length }}</span>
+    </div>
+    <div class="adventure-grid">
+        {% for a in past %}{{ adventure_card(a, vibe_labels) }}{% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if not adventures and not past %}
+<p class="empty-state">No events yet. <a href="{{ url_for('create_form') }}">Create the first one</a>!</p>
+{% endif %}
+{% endblock %}
