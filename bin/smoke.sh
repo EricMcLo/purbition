@@ -20,7 +20,7 @@ set -u
 # server, or kill the stale one first.
 
 LOCAL_URL="${LOCAL_URL:-http://127.0.0.1:8080}"
-PROD_URL="${PROD_URL:-https://adventure-9rb2.onrender.com}"
+PROD_URL="${PROD_URL:-https://purbition.com}"
 
 pass=0
 fail=0

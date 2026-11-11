@@ -35,7 +35,7 @@ WMO = {
 
 # User-Agent required by Nominatim usage policy (https://operations.osmfoundation.org/policies/nominatim/).
 # Without it, Nominatim returns 403.
-NOMINATIM_HEADERS = {'User-Agent': 'adventure-app/1.0 (https://adventure-9rb2.onrender.com)'}
+NOMINATIM_HEADERS = {'User-Agent': 'purbition/1.0 (https://purbition.com)'}
 
 
 def _http_get_json(url, *, headers=None, timeout=4):

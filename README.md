@@ -190,6 +190,8 @@ bin/                   dev tooling: screenshots, phone audit, smoke test
 
 - **No authentication, by design.** The security model is "anyone with the link."
   That is a deliberate product choice for a small friend group, not an oversight.
+  The live instance is my own friend-group deployment rather than a public
+  sandbox; the screenshots and example data in this repo are seeded and invented.
 - **Single-instance production.** The embedded Turso replica assumes one Railway
   service; scaling horizontally would need a different read strategy.
 - **No automated test suite yet.** I verify with route-level smoke checks,
